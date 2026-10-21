@@ -5,7 +5,7 @@ import json
 
 from myoverl_mcp.errors import ConflictError, ValidationError
 from myoverl_mcp.ids import new_id
-from myoverl_mcp.models import Heading, Resume, ResumeSummary, stencil_contact
+from myoverl_mcp.models import Bullet, Entry, Heading, Resume, ResumeSummary, Section, stencil_contact
 from myoverl_mcp.store import ResumeStore
 
 
@@ -235,6 +235,105 @@ def reorder_resume(
                 _require_permutation(row.items, patch["items"], "skill_items")
                 row.items = list(patch["items"])
 
+        return resume
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def _require_new_entry(title: str, bullets: list[str]) -> None:
+    if len(title) > 250:
+        raise ValidationError("title must be at most 250 characters")
+    if not 1 <= len(bullets) <= 8:
+        raise ValidationError("must supply 1 to 8 bullets")
+    if any(not bullet.strip() for bullet in bullets):
+        raise ValidationError("each bullet must be nonempty")
+
+
+def _section_of(resume: Resume, kind: str) -> Section:
+    for section in resume.sections:
+        if section.kind == kind:
+            return section
+    raise ValidationError(f"missing {kind} section")
+
+
+def _new_bullets(texts: list[str]) -> list[Bullet]:
+    return [Bullet(bullet_id=new_id("bul"), text=text) for text in texts]
+
+
+def add_experience(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    company: str,
+    title: str,
+    dates: str,
+    location: str,
+    bullets: list[str],
+) -> Resume:
+    _require_new_entry(title, bullets)
+    digest = _hash(
+        {
+            "company": company,
+            "title": title,
+            "dates": dates,
+            "location": location,
+            "bullets": bullets,
+        }
+    )
+
+    def mutate(resume: Resume) -> Resume:
+        section = _section_of(resume, "experience")
+        section.entries.append(
+            Entry(
+                entry_id=new_id("ent"),
+                kind="experience",
+                title=title,
+                fields={
+                    "company": company,
+                    "dates": dates,
+                    "location": location,
+                },
+                bullets=_new_bullets(bullets),
+            )
+        )
+        return resume
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def add_project(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    title: str,
+    technologies: list[str] | None,
+    link_url: str | None,
+    bullets: list[str],
+) -> Resume:
+    _require_new_entry(title, bullets)
+    digest = _hash(
+        {
+            "title": title,
+            "technologies": technologies,
+            "link_url": link_url,
+            "bullets": bullets,
+        }
+    )
+
+    def mutate(resume: Resume) -> Resume:
+        section = _section_of(resume, "projects")
+        section.entries.append(
+            Entry(
+                entry_id=new_id("ent"),
+                kind="project",
+                title=title,
+                technologies=list(technologies or []),
+                link_url=link_url,
+                bullets=_new_bullets(bullets),
+            )
+        )
         return resume
 
     return store.apply(resume_id, base_revision, request_id, digest, mutate)
