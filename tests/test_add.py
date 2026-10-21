@@ -3,7 +3,13 @@ from myoverl_mcp.ids import new_id
 from myoverl_mcp.models import Heading, Resume
 from myoverl_mcp.seed import seed_bright
 from myoverl_mcp.store import ResumeStore
-from myoverl_mcp.tools import add_experience, add_project, get_resume
+from myoverl_mcp.tools import (
+    add_experience,
+    add_project,
+    add_skill_items,
+    add_skill_row,
+    get_resume,
+)
 import pytest
 
 
@@ -262,3 +268,142 @@ def test_add_requires_matching_section():
             bullets=["Built a local scanner that flagged 8 unsafe eval calls in one repo."],
         )
     assert get_resume(store, src.resume_id).revision == src.revision
+
+
+def test_add_skill_row_ai_ml():
+    store = ResumeStore()
+    src = seed_bright(store)
+    skills = next(s for s in src.sections if s.kind == "skills")
+    original_ids = [r.row_id for r in skills.skill_rows]
+    out = add_skill_row(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-asr",
+        title="AI/ML",
+        items=["PyTorch", "LangChain"],
+    )
+    got = next(s for s in out.sections if s.kind == "skills")
+    added = got.skill_rows[-1]
+    assert [r.row_id for r in got.skill_rows[:-1]] == original_ids
+    assert added.title == "AI/ML"
+    assert added.items == ["PyTorch", "LangChain"]
+    assert added.row_id.startswith("row_")
+    assert added.row_id not in original_ids
+    assert added.wrap_lines == 1
+
+
+def test_add_skill_items_appends_pytest_if_missing():
+    store = ResumeStore()
+    src = seed_bright(store)
+    skills = next(s for s in src.sections if s.kind == "skills")
+    frameworks = next(r for r in skills.skill_rows if r.title == "Frameworks")
+    original = list(frameworks.items)
+    assert "Pytest" not in original
+    out = add_skill_items(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-asi",
+        row_id=frameworks.row_id,
+        items=["Pytest"],
+    )
+    got = next(
+        r
+        for s in out.sections
+        if s.kind == "skills"
+        for r in s.skill_rows
+        if r.row_id == frameworks.row_id
+    )
+    assert got.items == original + ["Pytest"]
+
+
+def test_add_skill_items_dedupes_exact_strings():
+    store = ResumeStore()
+    src = seed_bright(store)
+    tools_row = next(
+        r
+        for s in src.sections
+        if s.kind == "skills"
+        for r in s.skill_rows
+        if r.title == "Developer Tools"
+    )
+    original = list(tools_row.items)
+    assert "Pytest" in original
+    out = add_skill_items(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-asi-dup",
+        row_id=tools_row.row_id,
+        items=["Pytest", "Flask", "Pytest"],
+    )
+    got = next(
+        r
+        for s in out.sections
+        if s.kind == "skills"
+        for r in s.skill_rows
+        if r.row_id == tools_row.row_id
+    )
+    assert got.items == original + ["Flask"]
+    assert got.items.count("Pytest") == 1
+
+
+def test_add_skill_is_idempotent_for_same_request_id():
+    store = ResumeStore()
+    src = seed_bright(store)
+    first = add_skill_row(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-asr-replay",
+        title="AI/ML",
+        items=["PyTorch"],
+    )
+    second = add_skill_row(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-asr-replay",
+        title="AI/ML",
+        items=["PyTorch"],
+    )
+    skills = next(s for s in get_resume(store, src.resume_id).sections if s.kind == "skills")
+    first_row = next(s for s in first.sections if s.kind == "skills").skill_rows[-1]
+    second_row = next(s for s in second.sections if s.kind == "skills").skill_rows[-1]
+    assert first.revision == second.revision == src.revision + 1
+    assert first_row.row_id == second_row.row_id
+    assert len(skills.skill_rows) == 4
+
+
+def test_add_skill_rejects_unknown_row_and_missing_section():
+    store = ResumeStore()
+    src = seed_bright(store)
+    with pytest.raises(ValidationError):
+        add_skill_items(
+            store,
+            src.resume_id,
+            src.revision,
+            "req-bad-row",
+            row_id="row_missing",
+            items=["Pytest"],
+        )
+    empty = Resume(
+        resume_id=new_id("res"),
+        name="Bright",
+        role="source",
+        heading=Heading(name="Bright Owusu"),
+        editor_url="https://example.invalid/r/pending",
+    )
+    store.put(empty)
+    with pytest.raises(ValidationError):
+        add_skill_row(
+            store,
+            empty.resume_id,
+            empty.revision,
+            "req-no-skills",
+            title="AI/ML",
+            items=["PyTorch"],
+        )
+    assert get_resume(store, src.resume_id).revision == src.revision
+    assert get_resume(store, empty.resume_id).revision == empty.revision

@@ -5,7 +5,7 @@ import json
 
 from myoverl_mcp.errors import ConflictError, ValidationError
 from myoverl_mcp.ids import new_id
-from myoverl_mcp.models import Bullet, Entry, Heading, Resume, ResumeSummary, Section, stencil_contact
+from myoverl_mcp.models import Bullet, Entry, Heading, Resume, ResumeSummary, Section, SkillRow, stencil_contact
 from myoverl_mcp.store import ResumeStore
 
 
@@ -334,6 +334,59 @@ def add_project(
                 bullets=_new_bullets(bullets),
             )
         )
+        return resume
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def add_skill_row(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    title: str,
+    items: list[str],
+) -> Resume:
+    digest = _hash({"title": title, "items": items})
+
+    def mutate(resume: Resume) -> Resume:
+        section = _section_of(resume, "skills")
+        section.skill_rows.append(
+            SkillRow(
+                row_id=new_id("row"),
+                title=title,
+                items=list(items),
+            )
+        )
+        return resume
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def add_skill_items(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    row_id: str,
+    items: list[str],
+) -> Resume:
+    digest = _hash({"row_id": row_id, "items": items})
+
+    def mutate(resume: Resume) -> Resume:
+        rows_by_id = {
+            row.row_id: row
+            for section in resume.sections
+            for row in section.skill_rows
+        }
+        row = rows_by_id.get(row_id)
+        if row is None:
+            raise ValidationError(f"unknown row_id: {row_id}")
+        seen = set(row.items)
+        for item in items:
+            if item not in seen:
+                row.items.append(item)
+                seen.add(item)
         return resume
 
     return store.apply(resume_id, base_revision, request_id, digest, mutate)
