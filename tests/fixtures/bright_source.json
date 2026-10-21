@@ -1,0 +1,197 @@
+{
+  "resume_id": "res_bright_min",
+  "name": "Bright",
+  "role": "source",
+  "revision": 1,
+  "editor_url": "https://example.invalid/r/res_bright_min",
+  "page": {
+    "top_in": 0.15,
+    "bottom_in": 0.15,
+    "side_in": 0.5,
+    "max_pages": 1
+  },
+  "heading": {
+    "name": "Bright Owusu",
+    "slots": [
+      {
+        "slot_id": "slot_phone",
+        "kind": "phone",
+        "href": "tel:+13182658445",
+        "text": "(318) 265-8445"
+      },
+      {
+        "slot_id": "slot_email",
+        "kind": "email",
+        "href": "mailto:owusuomaribright@gmail.com",
+        "text": "owusuomaribright@gmail.com"
+      },
+      {
+        "slot_id": "slot_linkedin",
+        "kind": "linkedin",
+        "href": "https://www.linkedin.com/in/owusuomaribright",
+        "text": "linkedin.com/in/owusuomaribright"
+      },
+      {
+        "slot_id": "slot_portfolio",
+        "kind": "portfolio",
+        "href": "https://omari.is-a.dev",
+        "text": "Portfolio"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "section_id": "sec_education",
+      "kind": "education",
+      "title": "Education",
+      "entries": [
+        {
+          "entry_id": "ent_education",
+          "kind": "education",
+          "title": "Bachelor of Science in Cybersecurity",
+          "fields": {
+            "school": "Grambling State University",
+            "location": "Grambling, LA",
+            "degree": "Bachelor of Science in Cybersecurity",
+            "dates": "Aug. 2024 -- May 2028"
+          },
+          "honors": [
+            "Dean's List",
+            "Earl Lester Cole Honors College",
+            "Code2040",
+            "NSBE",
+            "ColorStack"
+          ],
+          "coursework": [
+            "Data Structures & Algorithms",
+            "Intro to AI",
+            "Operating Systems & Security",
+            "Databases and Data Security",
+            "Intrusion Detection and Protection"
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "sec_experience",
+      "kind": "experience",
+      "title": "Experience",
+      "entries": [
+        {
+          "entry_id": "ent_panw",
+          "kind": "experience",
+          "title": "Product Security Engineering Intern",
+          "fields": {
+            "company": "Palo Alto Networks",
+            "dates": "May 2026 -- Aug 2026",
+            "location": "Santa Clara, CA"
+          },
+          "bullets": [
+            {
+              "bullet_id": "bul_panw_1",
+              "text": "Automated privileged-access provisioning across 6 tenants, leveraging Apache Airflow and Microsoft Graph APIs to streamline request intake, approvals, and Entra group additions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "sec_projects",
+      "kind": "projects",
+      "title": "Projects",
+      "entries": [
+        {
+          "entry_id": "ent_immigration",
+          "kind": "project",
+          "title": "Immigration Assistant (Best Overall Project, Code2040 TFR Hackathon)",
+          "technologies": [
+            "Python",
+            "LangChain",
+            "PyTorch",
+            "React",
+            "Gemini"
+          ],
+          "link_url": "https://omariomari2.github.io/webpager/",
+          "bullets": [
+            {
+              "bullet_id": "bul_immigration_1",
+              "text": "Led 3 engineers to build a RAG pipeline over 500K+ lines of USCIS policy using LangChain, achieving 88% answer accuracy on a human-annotated eval set of 200 Q&A pairs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "sec_skills",
+      "kind": "skills",
+      "title": "Technical Skills",
+      "skill_rows": [
+        {
+          "row_id": "row_languages",
+          "title": "Languages",
+          "items": [
+            "Python",
+            "Go",
+            "TypeScript",
+            "JavaScript",
+            "C++",
+            "PHP",
+            "Bash",
+            "SQL"
+          ]
+        },
+        {
+          "row_id": "row_frameworks",
+          "title": "Frameworks",
+          "items": [
+            "Flask",
+            "FastAPI",
+            "React",
+            "Vite",
+            "Fiber v2",
+            "LangChain",
+            "PyTorch",
+            "Google ADK",
+            "LiteLLM"
+          ]
+        },
+        {
+          "row_id": "row_tools",
+          "title": "Developer Tools",
+          "items": [
+            "GCP",
+            "AWS",
+            "Azure",
+            "Terraform",
+            "Docker",
+            "GitHub Actions",
+            "Apache Airflow",
+            "Pytest",
+            "Bitbucket"
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "sec_extras",
+      "kind": "extracurriculars",
+      "title": "Extracurriculars",
+      "entries": [
+        {
+          "entry_id": "ent_gsd",
+          "kind": "extracurricular",
+          "title": "Google Student Developer",
+          "fields": {
+            "dates": "Jun 2025 -- Present"
+          },
+          "bullets": [
+            {
+              "bullet_id": "bul_gsd_1",
+              "text": "Solved complex algorithmic challenges in C++, optimizing for strict time and space complexities"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
