@@ -11,6 +11,7 @@ class ResumeStore:
     def __init__(self) -> None:
         self._resumes: dict[str, Resume] = {}
         self._replays: dict[tuple[str, str], tuple[str, Resume]] = {}
+        self._copy_replays: dict[tuple[str, str], Resume] = {}
 
     def put(self, resume: Resume) -> Resume:
         self._resumes[resume.resume_id] = resume
@@ -24,6 +25,15 @@ class ResumeStore:
 
     def list_all(self) -> list[Resume]:
         return [deepcopy(r) for r in self._resumes.values()]
+
+    def remember_copy(self, source_id: str, request_id: str, resume: Resume) -> None:
+        self._copy_replays[(source_id, request_id)] = deepcopy(resume)
+
+    def lookup_copy(self, source_id: str, request_id: str) -> Resume | None:
+        saved = self._copy_replays.get((source_id, request_id))
+        if saved is None:
+            return None
+        return deepcopy(saved)
 
     def apply(
         self,
