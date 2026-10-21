@@ -120,6 +120,26 @@ def test_cannot_hide_sections_on_source():
     assert extra_id in [s.section_id for s in get_resume(store, src.resume_id).sections]
 
 
+def test_source_set_layout_empty_hide_list_updates_margins():
+    store = ResumeStore()
+    src = seed_bright(store)
+    out = set_layout(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-empty-hide",
+        top_in=0.2,
+        bottom_in=0.2,
+        side_in=0.3,
+        project_header_lines=None,
+        hide_section_ids=[],
+    )
+    assert out.page.top_in == out.page.bottom_in == 0.2
+    assert out.page.side_in == 0.3
+    assert [s.section_id for s in out.sections] == [s.section_id for s in src.sections]
+    assert get_resume(store, src.resume_id).page.side_in == 0.3
+
+
 def test_hide_section_ids_on_copy():
     store = ResumeStore()
     src = seed_bright(store)

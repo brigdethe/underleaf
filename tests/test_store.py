@@ -25,6 +25,18 @@ def test_conflict_on_stale_revision(store):
     assert err.value.current_revision == 2
 
 
+def test_put_deepcopies_in_and_out(store):
+    resume = make_source()
+    original = resume.heading.name
+    returned = store.put(resume)
+    resume.heading.name = "Mutated input"
+    returned.heading.name = "Mutated return"
+    got = store.get(resume.resume_id)
+    assert got.heading.name == original
+    assert got is not resume
+    assert got is not returned
+
+
 def test_same_request_id_and_args_replays(store):
     resume = make_source()
     store.put(resume)

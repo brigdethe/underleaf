@@ -29,3 +29,14 @@ def test_copy_replay():
     a = copy_resume(store, src.resume_id, src.revision, "req-dup", "Same")
     b = copy_resume(store, src.resume_id, src.revision, "req-dup", "Same")
     assert a.resume_id == b.resume_id
+
+
+def test_copy_same_request_id_different_name_conflicts():
+    store = ResumeStore()
+    src = seed_bright(store)
+    first = copy_resume(store, src.resume_id, src.revision, "req-dup", "Same")
+    with pytest.raises(ConflictError):
+        copy_resume(store, src.resume_id, src.revision, "req-dup", "Other")
+    stored = get_resume(store, first.resume_id)
+    assert stored.name == "Same"
+    assert get_resume(store, src.resume_id).revision == src.revision

@@ -46,9 +46,15 @@ def test_registered_tools_match_tool_names():
     seed_bright(store)
     server = make_server(store)
     assert _registered_names(server) == set(TOOL_NAMES)
-    for tool in server._tool_manager.list_tools():
+    tools = {tool.name: tool for tool in server._tool_manager.list_tools()}
+    for tool in tools.values():
         properties = tool.parameters.get("properties", {})
         assert "store" not in properties
+    layout_required = set(tools["set_layout"].parameters.get("required", []))
+    update_required = set(tools["update_resume"].parameters.get("required", []))
+    assert layout_required == {"resume_id", "base_revision", "request_id"}
+    assert "hide_section_ids" not in layout_required
+    assert "heading" not in update_required
 
 
 def test_list_resumes_via_server():
@@ -59,6 +65,52 @@ def test_list_resumes_via_server():
     assert result.is_error is False
     names = [row["name"] for row in result.structured_content["result"]]
     assert names == ["Bright"]
+
+
+def _wvs(resume: dict) -> dict:
+    return next(
+        entry
+        for section in resume["sections"]
+        if section["kind"] == "projects"
+        for entry in section["entries"]
+        if entry["title"].startswith("WVS")
+    )
+
+
+def test_get_resume_via_server():
+    store = ResumeStore()
+    src = seed_bright(store)
+    server = make_server(store)
+    result = _call(server, "get_resume", {"resume_id": src.resume_id})
+    assert result.is_error is False
+    resume = result.structured_content
+    assert resume["resume_id"] == src.resume_id
+    assert resume["heading"]["name"] == "Bright Owusu"
+    assert resume["heading"]["slots"][0]["kind"] == "phone"
+    assert _wvs(resume)["link_url"] is None
+
+
+def test_copy_resume_via_server():
+    store = ResumeStore()
+    src = seed_bright(store)
+    server = make_server(store)
+    result = _call(
+        server,
+        "copy_resume",
+        {
+            "resume_id": src.resume_id,
+            "base_revision": src.revision,
+            "request_id": "req-copy-mcp",
+            "copy_name": "PANW intern",
+        },
+    )
+    assert result.is_error is False
+    copied = result.structured_content
+    assert copied["role"] == "copy"
+    assert copied["source_id"] == src.resume_id
+    assert copied["name"] == "PANW intern"
+    assert copied["heading"]["name"] == "Bright Owusu"
+    assert _wvs(copied)["link_url"] is None
 
 
 def test_get_resume_not_found_is_tool_error():

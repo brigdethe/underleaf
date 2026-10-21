@@ -117,6 +117,35 @@ def test_add_project_with_link_url():
     assert added.technologies == []
 
 
+def test_add_project_none_and_empty_technologies_replay():
+    store = ResumeStore()
+    src = seed_bright(store)
+    first = add_project(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-ap-tech-replay",
+        title="Lab Bench",
+        technologies=None,
+        link_url=None,
+        bullets=["Built a local scanner that flagged 8 unsafe eval calls in one repo."],
+    )
+    second = add_project(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-ap-tech-replay",
+        title="Lab Bench",
+        technologies=[],
+        link_url=None,
+        bullets=["Built a local scanner that flagged 8 unsafe eval calls in one repo."],
+    )
+    projects = next(s for s in get_resume(store, src.resume_id).sections if s.kind == "projects")
+    assert first.revision == second.revision == src.revision + 1
+    assert first.sections[2].entries[-1].entry_id == second.sections[2].entries[-1].entry_id
+    assert len(projects.entries) == 4
+
+
 def test_add_assigns_new_entry_and_bullet_ids():
     store = ResumeStore()
     src = seed_bright(store)

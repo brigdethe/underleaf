@@ -1,5 +1,4 @@
 from collections import Counter
-from copy import deepcopy
 import hashlib
 import json
 
@@ -11,6 +10,16 @@ from myoverl_mcp.store import ResumeStore
 
 def _hash(payload: dict) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def _guard_patch(mutate):
+    def wrapped(resume: Resume) -> Resume:
+        try:
+            return mutate(resume)
+        except (KeyError, TypeError) as exc:
+            raise ValidationError(str(exc)) from exc
+
+    return wrapped
 
 
 def _require_permutation(actual: list[str], requested: list[str], label: str) -> None:
@@ -42,10 +51,14 @@ def copy_resume(
     request_id: str,
     copy_name: str,
 ) -> Resume:
+    digest = _hash({"copy_name": copy_name, "base_revision": base_revision})
     src = store.get(resume_id)
-    replayed = store.lookup_copy(src.resume_id, request_id)
-    if replayed is not None:
-        return replayed
+    saved = store.lookup_copy(src.resume_id, request_id)
+    if saved is not None:
+        saved_hash, replayed = saved
+        if saved_hash == digest:
+            return replayed
+        raise ConflictError(src.revision)
     if src.revision != base_revision:
         raise ConflictError(src.revision)
     copied = src.model_copy(deep=True)
@@ -55,9 +68,9 @@ def copy_resume(
     copied.name = copy_name
     copied.revision = 1
     copied.editor_url = f"https://example.invalid/r/{copied.resume_id}"
-    store.put(copied)
-    store.remember_copy(src.resume_id, request_id, copied)
-    return deepcopy(copied)
+    stored = store.put(copied)
+    store.remember_copy(src.resume_id, request_id, digest, copied)
+    return stored
 
 
 def update_resume(
@@ -160,7 +173,7 @@ def update_resume(
 
         return resume
 
-    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+    return store.apply(resume_id, base_revision, request_id, digest, _guard_patch(mutate))
 
 
 def reorder_resume(
@@ -237,7 +250,7 @@ def reorder_resume(
 
         return resume
 
-    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+    return store.apply(resume_id, base_revision, request_id, digest, _guard_patch(mutate))
 
 
 def _require_new_entry(title: str, bullets: list[str]) -> None:
@@ -313,10 +326,11 @@ def add_project(
     bullets: list[str],
 ) -> Resume:
     _require_new_entry(title, bullets)
+    techs = list(technologies or [])
     digest = _hash(
         {
             "title": title,
-            "technologies": technologies,
+            "technologies": techs,
             "link_url": link_url,
             "bullets": bullets,
         }
@@ -329,7 +343,7 @@ def add_project(
                 entry_id=new_id("ent"),
                 kind="project",
                 title=title,
-                technologies=list(technologies or []),
+                technologies=techs,
                 link_url=link_url,
                 bullets=_new_bullets(bullets),
             )
@@ -429,11 +443,11 @@ def set_layout(
     resume_id: str,
     base_revision: int,
     request_id: str,
-    top_in: float | None,
-    bottom_in: float | None,
-    side_in: float | None,
-    project_header_lines: int | None,
-    hide_section_ids: list[str] | None,
+    top_in: float | None = None,
+    bottom_in: float | None = None,
+    side_in: float | None = None,
+    project_header_lines: int | None = None,
+    hide_section_ids: list[str] | None = None,
 ) -> Resume:
     digest = _hash(
         {
@@ -446,7 +460,7 @@ def set_layout(
     )
 
     def mutate(resume: Resume) -> Resume:
-        if hide_section_ids is not None and resume.role == "source":
+        if hide_section_ids and resume.role == "source":
             raise SourceProtectedError()
 
         if top_in is not None or bottom_in is not None:

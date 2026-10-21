@@ -134,3 +134,25 @@ def test_reorder_skill_rows_and_items():
     assert [r.row_id for r in got.skill_rows] == flipped_rows
     moved = next(r for r in got.skill_rows if r.row_id == first.row_id)
     assert moved.items == flipped_items
+
+
+def test_malformed_reorder_patches_raise_validation_error():
+    store = ResumeStore()
+    src = seed_bright(store)
+    with pytest.raises(ValidationError):
+        reorder_resume(
+            store,
+            src.resume_id,
+            src.revision,
+            "req-bad-entry-order",
+            entry_orders=[{"entry_ids": []}],
+        )
+    with pytest.raises(ValidationError):
+        reorder_resume(
+            store,
+            src.resume_id,
+            src.revision,
+            "req-bad-skill-items",
+            skill_items=[{"items": []}],
+        )
+    assert get_resume(store, src.resume_id).revision == src.revision

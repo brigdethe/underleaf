@@ -108,6 +108,36 @@ def test_entry_skill_and_coursework_patches():
     ]
 
 
+def test_malformed_patches_raise_validation_error():
+    store = ResumeStore()
+    src = seed_bright(store)
+    with pytest.raises(ValidationError):
+        update_resume(
+            store,
+            src.resume_id,
+            src.revision,
+            "req-missing-id",
+            bullets=[{"text": "nope"}],
+        )
+    with pytest.raises(ValidationError):
+        update_resume(
+            store,
+            src.resume_id,
+            src.revision,
+            "req-missing-items",
+            coursework=[{"entry_id": src.sections[0].entries[0].entry_id}],
+        )
+    with pytest.raises(ValidationError):
+        update_resume(
+            store,
+            src.resume_id,
+            src.revision,
+            "req-bad-type",
+            skill_rows=[{"row_id": src.sections[3].skill_rows[0].row_id, "items": None}],
+        )
+    assert get_resume(store, src.resume_id).revision == src.revision
+
+
 def test_update_replay_same_request():
     store = ResumeStore()
     src = seed_bright(store)

@@ -11,11 +11,12 @@ class ResumeStore:
     def __init__(self) -> None:
         self._resumes: dict[str, Resume] = {}
         self._replays: dict[tuple[str, str], tuple[str, Resume]] = {}
-        self._copy_replays: dict[tuple[str, str], Resume] = {}
+        self._copy_replays: dict[tuple[str, str], tuple[str, Resume]] = {}
 
     def put(self, resume: Resume) -> Resume:
-        self._resumes[resume.resume_id] = resume
-        return resume
+        stored = deepcopy(resume)
+        self._resumes[resume.resume_id] = stored
+        return deepcopy(stored)
 
     def get(self, resume_id: str) -> Resume:
         try:
@@ -26,14 +27,15 @@ class ResumeStore:
     def list_all(self) -> list[Resume]:
         return [deepcopy(r) for r in self._resumes.values()]
 
-    def remember_copy(self, source_id: str, request_id: str, resume: Resume) -> None:
-        self._copy_replays[(source_id, request_id)] = deepcopy(resume)
+    def remember_copy(self, source_id: str, request_id: str, args_hash: str, resume: Resume) -> None:
+        self._copy_replays[(source_id, request_id)] = (args_hash, deepcopy(resume))
 
-    def lookup_copy(self, source_id: str, request_id: str) -> Resume | None:
+    def lookup_copy(self, source_id: str, request_id: str) -> tuple[str, Resume] | None:
         saved = self._copy_replays.get((source_id, request_id))
         if saved is None:
             return None
-        return deepcopy(saved)
+        saved_hash, resume = saved
+        return saved_hash, deepcopy(resume)
 
     def apply(
         self,
