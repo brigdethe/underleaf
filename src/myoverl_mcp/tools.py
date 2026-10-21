@@ -1,3 +1,4 @@
+from collections import Counter
 from copy import deepcopy
 import hashlib
 import json
@@ -10,6 +11,11 @@ from myoverl_mcp.store import ResumeStore
 
 def _hash(payload: dict) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def _require_permutation(actual: list[str], requested: list[str], label: str) -> None:
+    if Counter(requested) != Counter(actual):
+        raise ValidationError(f"invalid {label} permutation")
 
 
 def list_resumes(store: ResumeStore) -> list[ResumeSummary]:
@@ -151,6 +157,83 @@ def update_resume(
                 if entry is None:
                     raise ValidationError(f"unknown entry_id: {patch['entry_id']}")
                 entry.coursework = list(patch["items"])
+
+        return resume
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def reorder_resume(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    section_ids: list[str] | None = None,
+    entry_orders: list[dict] | None = None,
+    skill_row_ids: list[str] | None = None,
+    skill_items: list[dict] | None = None,
+) -> Resume:
+    if (
+        section_ids is None
+        and entry_orders is None
+        and skill_row_ids is None
+        and skill_items is None
+    ):
+        raise ValidationError("at least one reorder argument is required")
+
+    digest = _hash(
+        {
+            "section_ids": section_ids,
+            "entry_orders": entry_orders,
+            "skill_row_ids": skill_row_ids,
+            "skill_items": skill_items,
+        }
+    )
+
+    def mutate(resume: Resume) -> Resume:
+        if section_ids is not None:
+            by_id = {section.section_id: section for section in resume.sections}
+            _require_permutation(list(by_id), section_ids, "section_ids")
+            resume.sections = [by_id[sid] for sid in section_ids]
+
+        if entry_orders is not None:
+            sections_by_id = {section.section_id: section for section in resume.sections}
+            for order in entry_orders:
+                section = sections_by_id.get(order["section_id"])
+                if section is None:
+                    raise ValidationError(f"unknown section_id: {order['section_id']}")
+                entries_by_id = {entry.entry_id: entry for entry in section.entries}
+                requested = order["entry_ids"]
+                _require_permutation(list(entries_by_id), requested, "entry_ids")
+                section.entries = [entries_by_id[eid] for eid in requested]
+
+        if skill_row_ids is not None:
+            rows_by_id = {
+                row.row_id: row
+                for section in resume.sections
+                for row in section.skill_rows
+            }
+            _require_permutation(list(rows_by_id), skill_row_ids, "skill_row_ids")
+            for section in resume.sections:
+                if not section.skill_rows:
+                    continue
+                owned = {row.row_id for row in section.skill_rows}
+                section.skill_rows = [
+                    rows_by_id[rid] for rid in skill_row_ids if rid in owned
+                ]
+
+        if skill_items is not None:
+            rows_by_id = {
+                row.row_id: row
+                for section in resume.sections
+                for row in section.skill_rows
+            }
+            for patch in skill_items:
+                row = rows_by_id.get(patch["row_id"])
+                if row is None:
+                    raise ValidationError(f"unknown row_id: {patch['row_id']}")
+                _require_permutation(row.items, patch["items"], "skill_items")
+                row.items = list(patch["items"])
 
         return resume
 
