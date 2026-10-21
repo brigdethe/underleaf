@@ -3,7 +3,7 @@ from copy import deepcopy
 import hashlib
 import json
 
-from myoverl_mcp.errors import ConflictError, ValidationError
+from myoverl_mcp.errors import ConflictError, SourceProtectedError, ValidationError
 from myoverl_mcp.ids import new_id
 from myoverl_mcp.models import Bullet, Entry, Heading, Resume, ResumeSummary, Section, SkillRow, stencil_contact
 from myoverl_mcp.store import ResumeStore
@@ -387,6 +387,95 @@ def add_skill_items(
             if item not in seen:
                 row.items.append(item)
                 seen.add(item)
+        return resume
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def remove_entry(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    entry_id: str,
+) -> Resume:
+    digest = _hash({"entry_id": entry_id})
+
+    def mutate(resume: Resume) -> Resume:
+        for section in resume.sections:
+            for index, entry in enumerate(section.entries):
+                if entry.entry_id != entry_id:
+                    continue
+                if resume.role == "source" and entry.kind in ("experience", "project"):
+                    raise SourceProtectedError()
+                if entry.kind == "education":
+                    remaining = sum(
+                        1
+                        for candidate_section in resume.sections
+                        for candidate in candidate_section.entries
+                        if candidate.kind == "education"
+                    )
+                    if remaining <= 1:
+                        raise ValidationError("cannot remove the last education entry")
+                section.entries.pop(index)
+                return resume
+        raise ValidationError(f"unknown entry_id: {entry_id}")
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def set_layout(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    top_in: float | None,
+    bottom_in: float | None,
+    side_in: float | None,
+    project_header_lines: int | None,
+    hide_section_ids: list[str] | None,
+) -> Resume:
+    digest = _hash(
+        {
+            "top_in": top_in,
+            "bottom_in": bottom_in,
+            "side_in": side_in,
+            "project_header_lines": project_header_lines,
+            "hide_section_ids": hide_section_ids,
+        }
+    )
+
+    def mutate(resume: Resume) -> Resume:
+        if hide_section_ids is not None and resume.role == "source":
+            raise SourceProtectedError()
+
+        if top_in is not None or bottom_in is not None:
+            if top_in is not None and bottom_in is not None and top_in != bottom_in:
+                raise ValidationError("top and bottom margins must match")
+            value = top_in if top_in is not None else bottom_in
+            resume.page.top_in = value
+            resume.page.bottom_in = value
+        if side_in is not None:
+            resume.page.side_in = side_in
+
+        if project_header_lines is not None:
+            if project_header_lines not in (1, 2):
+                raise ValidationError("project_header_lines must be 1 or 2")
+            for section in resume.sections:
+                for entry in section.entries:
+                    if entry.kind == "project":
+                        entry.header_lines = project_header_lines
+
+        if hide_section_ids is not None:
+            by_id = {section.section_id: section for section in resume.sections}
+            for section_id in hide_section_ids:
+                if section_id not in by_id:
+                    raise ValidationError(f"unknown section_id: {section_id}")
+            hidden = set(hide_section_ids)
+            resume.sections = [
+                section for section in resume.sections if section.section_id not in hidden
+            ]
+
         return resume
 
     return store.apply(resume_id, base_revision, request_id, digest, mutate)
