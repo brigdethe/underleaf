@@ -1,9 +1,15 @@
 from copy import deepcopy
+import hashlib
+import json
 
-from myoverl_mcp.errors import ConflictError
+from myoverl_mcp.errors import ConflictError, ValidationError
 from myoverl_mcp.ids import new_id
-from myoverl_mcp.models import Resume, ResumeSummary
+from myoverl_mcp.models import Heading, Resume, ResumeSummary, stencil_contact
 from myoverl_mcp.store import ResumeStore
+
+
+def _hash(payload: dict) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
 def list_resumes(store: ResumeStore) -> list[ResumeSummary]:
@@ -46,3 +52,106 @@ def copy_resume(
     store.put(copied)
     store.remember_copy(src.resume_id, request_id, copied)
     return deepcopy(copied)
+
+
+def update_resume(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    heading: dict | None = None,
+    bullets: list[dict] | None = None,
+    entry_fields: list[dict] | None = None,
+    skill_rows: list[dict] | None = None,
+    coursework: list[dict] | None = None,
+) -> Resume:
+    digest = _hash(
+        {
+            "heading": heading,
+            "bullets": bullets,
+            "entry_fields": entry_fields,
+            "skill_rows": skill_rows,
+            "coursework": coursework,
+        }
+    )
+
+    def mutate(resume: Resume) -> Resume:
+        if heading is not None:
+            if "name" in heading:
+                resume.heading.name = heading["name"]
+            if "slots" in heading:
+                rebuilt = [
+                    stencil_contact(
+                        kind=slot["kind"],
+                        href=slot["href"],
+                        text=slot.get("text"),
+                    )
+                    for slot in heading["slots"]
+                ]
+                resume.heading.slots = Heading(
+                    name=resume.heading.name,
+                    slots=rebuilt,
+                ).ordered_slots()
+
+        if bullets:
+            by_id = {
+                bullet.bullet_id: bullet
+                for section in resume.sections
+                for entry in section.entries
+                for bullet in entry.bullets
+            }
+            for patch in bullets:
+                bullet = by_id.get(patch["bullet_id"])
+                if bullet is None:
+                    raise ValidationError(f"unknown bullet_id: {patch['bullet_id']}")
+                bullet.text = patch["text"]
+
+        entries_by_id = {
+            entry.entry_id: entry
+            for section in resume.sections
+            for entry in section.entries
+        }
+
+        if entry_fields:
+            for patch in entry_fields:
+                entry = entries_by_id.get(patch["entry_id"])
+                if entry is None:
+                    raise ValidationError(f"unknown entry_id: {patch['entry_id']}")
+                if "fields" in patch:
+                    entry.fields.update(patch["fields"])
+                if "honors" in patch:
+                    entry.honors = list(patch["honors"])
+                if "technologies" in patch:
+                    entry.technologies = list(patch["technologies"])
+                if "link_url" in patch:
+                    entry.link_url = patch["link_url"]
+                if "header_lines" in patch:
+                    entry.header_lines = patch["header_lines"]
+
+        if skill_rows:
+            rows_by_id = {
+                row.row_id: row
+                for section in resume.sections
+                for row in section.skill_rows
+            }
+            for patch in skill_rows:
+                row = rows_by_id.get(patch["row_id"])
+                if row is None:
+                    raise ValidationError(f"unknown row_id: {patch['row_id']}")
+                if "title" in patch:
+                    row.title = patch["title"]
+                if "items" in patch:
+                    row.items = list(patch["items"])
+                if "wrap_lines" in patch:
+                    row.wrap_lines = patch["wrap_lines"]
+
+        if coursework:
+            for patch in coursework:
+                entry = entries_by_id.get(patch["entry_id"])
+                if entry is None:
+                    raise ValidationError(f"unknown entry_id: {patch['entry_id']}")
+                entry.coursework = list(patch["items"])
+
+        return resume
+
+    return store.apply(resume_id, base_revision, request_id, digest, mutate)
