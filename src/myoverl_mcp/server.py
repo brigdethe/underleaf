@@ -11,15 +11,18 @@ from myoverl_mcp.errors import (
     SourceProtectedError,
     ValidationError as DomainValidationError,
 )
+from myoverl_mcp.instructions import INSTRUCTIONS, tailor
 from myoverl_mcp.seed import seed_bright
 from myoverl_mcp.store import ResumeStore
 
 try:
     from mcp.server.fastmcp import FastMCP
     from mcp.server.fastmcp.exceptions import ToolError
+    from mcp.server.fastmcp.prompts.base import Prompt
 except ModuleNotFoundError:
     from mcp.server.mcpserver import MCPServer as FastMCP
     from mcp.server.mcpserver.exceptions import ToolError
+    from mcp.server.mcpserver.prompts.base import Prompt
 
 TOOL_NAMES = (
     "list_resumes",
@@ -68,17 +71,17 @@ def _bind(fn: Callable[..., Any], store: ResumeStore) -> Callable[..., Any]:
 
 
 def make_server(store: ResumeStore) -> FastMCP:
-    server = FastMCP("myoverl")
+    server = FastMCP("underleaf", instructions=INSTRUCTIONS)
     for name in TOOL_NAMES:
         server.add_tool(_bind(getattr(tool_fns, name), store), name=name)
+    server.add_prompt(Prompt.from_function(tailor, name="tailor"))
     return server
 
 
 def main() -> None:
-    store = ResumeStore()
-    seed_bright(store)
-    server = make_server(store)
-    server.run()
+    from myoverl_mcp.app import main as app_main
+
+    app_main()
 
 
 if __name__ == "__main__":

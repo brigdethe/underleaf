@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: underleaf
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8765
+    disk:
+      name: underleaf-data
+      mountPath: /app/data
+      sizeGB: 1

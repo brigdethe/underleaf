@@ -110,10 +110,12 @@ def test_add_project_with_link_url():
         title="Lab Bench",
         technologies=None,
         link_url="https://example.invalid/lab",
+        link_text="Lab",
         bullets=["Built a local scanner that flagged 8 unsafe eval calls in one repo."],
     )
     added = next(s for s in out.sections if s.kind == "projects").entries[-1]
     assert added.link_url == "https://example.invalid/lab"
+    assert added.link_text == "Lab"
     assert added.technologies == []
 
 

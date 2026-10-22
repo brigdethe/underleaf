@@ -1,0 +1,6 @@
+PDF.js 6.3.289, build 1c8020a7d
+Copyright Mozilla Foundation. Licensed under Apache License 2.0.
+License notices are preserved at the top of pdf.mjs and pdf.worker.mjs.
+Source: https://github.com/mozilla/pdf.js
+These matching browser and worker bundles were obtained from the original
+Myoverl editor's /vendor/pdfjs/ assets, and are served locally.

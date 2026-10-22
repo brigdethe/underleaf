@@ -82,6 +82,7 @@ class Entry(BaseModel):
     honors: list[str] = Field(default_factory=list)
     technologies: list[str] = Field(default_factory=list)
     link_url: str | None = None
+    link_text: str | None = None
     header_lines: Literal[1, 2] = 2
 
 

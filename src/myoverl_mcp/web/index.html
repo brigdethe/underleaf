@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Underleaf · Resume</title>
+  <style>
+    :root {
+      --ink: #111;
+      --muted: #5f6368;
+      --line: #dadce0;
+      --paper: #fff;
+      --page: #e8eaed;
+      --green: #1f4d3a;
+      --focus: #1a73e8;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    header.chrome {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      height: 46px;
+    }
+    .brand {
+      font-weight: 700;
+      font-size: 17px;
+      letter-spacing: -0.03em;
+      text-decoration: none;
+      color: var(--ink);
+      margin-right: 6px;
+      user-select: none;
+    }
+    select, button, input {
+      font: inherit;
+    }
+    .select-sm {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+      max-width: 220px;
+    }
+    .select-sm:focus { border-color: var(--focus); }
+    .btn-sm {
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+    }
+    .btn-sm::-webkit-details-marker { display: none; }
+    .btn-sm:hover { background: #f3f4f6; }
+    .btn-done {
+      background: #e6f4ea;
+      border: 1px solid #34a853;
+      color: #137333;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-done:hover { background: #ceead6; }
+    .spacer { flex: 1; }
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #34a853;
+      display: inline-block;
+    }
+    .download {
+      background: var(--green);
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .download:hover { background: #16382a; }
+    .download:disabled { opacity: 0.5; cursor: default; }
+
+    .actions-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .menu-popover {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      min-width: 150px;
+      padding: 4px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .menu-item {
+      background: none;
+      border: 0;
+      color: var(--ink);
+      text-align: left;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .menu-item:hover {
+      background: #f3f4f6;
+    }
+    .stage {
+      padding: 20px 16px 40px;
+      overflow: auto;
+    }
+    .paper-stack { width: max-content; margin: 0 auto; }
+    .pdf-page {
+      position: relative;
+      background: #fff;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(60,64,67,.15), 0 8px 24px rgba(60,64,67,.12);
+    }
+    .pdf-page canvas { display: block; }
+    .text-hit {
+      position: absolute;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: text;
+      border-radius: 2px;
+    }
+    .text-hit[aria-label^="Edit link"],
+    .text-hit[aria-label^="Edit slot-text"] { cursor: pointer; }
+    .text-hit:hover, .text-hit:focus-visible {
+      outline: 1px solid var(--focus);
+      background: rgba(26,115,232,.06);
+    }
+    .edit-mask { position: absolute; background: #fff; pointer-events: none; }
+    .text-editor {
+      position: absolute;
+      z-index: 2;
+      margin: 0;
+      padding: 0;
+      color: #000;
+      background: #fff;
+      outline: 1px solid var(--focus);
+      border: 0;
+      line-height: 1.2;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      transform-origin: top left;
+      font-synthesis: none;
+    }
+    .preview-message { padding: 32px; max-width: 540px; }
+    .preview-notice {
+      margin: 0 auto 16px;
+      max-width: 816px;
+      padding: 10px 14px;
+      color: #8a1c13;
+      background: #fff0ec;
+      border: 1px solid #eac4be;
+      border-radius: 6px;
+    }
+    [hidden] { display: none !important; }
+    @media (max-width: 640px) {
+      .row { gap: 6px; padding: 6px 10px; height: auto; flex-wrap: wrap; }
+      .select-sm { max-width: 140px; }
+      .stage { padding: 12px 6px 32px; }
+    }
+    dialog {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px;
+      width: min(420px, 92vw);
+    }
+    dialog h2 { margin: 0 0 8px; font-size: 18px; }
+    dialog label { display: block; font-size: 13px; margin: 10px 0 4px; }
+    dialog input, dialog textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    dialog .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 4px;
+      font-size: 13px;
+    }
+    dialog .check input { width: auto; margin: 0; }
+    dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 16px 0 0; }
+    .error { color: #b3261e; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header class="chrome">
+    <div class="row">
+      <a class="brand" href="/">underleaf.</a>
+      <select id="person" class="select-sm" aria-label="Person"></select>
+      <select id="resume" class="select-sm" aria-label="Saved resumes"></select>
+      <details class="actions-dropdown">
+        <summary class="btn-sm">Actions &#9662;</summary>
+        <div class="menu-popover">
+          <button class="menu-item" id="contacts">Contact links</button>
+          <button class="menu-item" id="add-project">Add project</button>
+          <button class="menu-item" id="rename">Rename</button>
+          <button class="menu-item" id="copy">Make a copy</button>
+          <button class="menu-item" id="add-person">Add person</button>
+        </div>
+      </details>
+      <button class="btn-done" id="finish-editing" hidden>Done editing &#10003;</button>
+      <span class="spacer"></span>
+      <span class="status" id="status">Saved</span>
+      <select id="zoom" class="select-sm" aria-label="Document zoom">
+        <option value="fit">Fit</option>
+        <option value="1.3333333333">100%</option>
+        <option value="1.6666666667">125%</option>
+        <option value="2">150%</option>
+      </select>
+      <button class="download" id="download">Download PDF</button>
+      <span id="page-count" hidden></span>
+    </div>
+  </header>
+  <main class="stage">
+    <div class="preview-notice" id="preview-notice" role="alert" hidden></div>
+    <div class="paper-stack" id="paper" aria-label="Resume preview"><p class="preview-message">Opening resume...</p></div>
+  </main>
+
+  <dialog id="dlg-copy">
+    <h2>Make a copy</h2>
+    <label for="copy-name">Copy name</label>
+    <input id="copy-name" type="text" placeholder="PANW intern">
+    <menu>
+      <button class="ghost" value="cancel">Cancel</button>
+      <button class="download" value="ok">Copy</button>
+    </menu>
+  </dialog>
+  <dialog id="dlg-person">
+    <h2>Add person</h2>
+    <p>Copies Bright’s body, then swaps the heading.</p>
+    <label for="person-name">Short name</label>
+    <input id="person-name" type="text" placeholder="Beth">
+    <label for="heading-name">Name on the resume</label>
+    <input id="heading-name" type="text" placeholder="Beth Example">
+    <menu>
+      <button class="ghost" value="cancel">Cancel</button>
+      <button class="download" value="ok">Add</button>
+    </menu>
+  </dialog>
+  <dialog id="dlg-rename">
+    <h2>Name your resume</h2>
+    <label for="resume-name">Resume name</label>
+    <input id="resume-name" type="text">
+    <menu>
+      <button class="ghost" value="cancel">Cancel</button>
+      <button class="download" value="ok">Save</button>
+    </menu>
+  </dialog>
+  <dialog id="dlg-project">
+    <h2>Add project</h2>
+    <label for="proj-title">Project title</label>
+    <input id="proj-title" type="text">
+    <label for="proj-tech">Technologies (optional)</label>
+    <input id="proj-tech" type="text" placeholder="Python, React">
+    <label for="proj-link">Link address (optional)</label>
+    <input id="proj-link" type="url">
+    <label for="proj-link-text">Display text (optional)</label>
+    <input id="proj-link-text" type="text" placeholder="Link">
+    <label for="proj-bullets">Bullets (one per line, 1–8)</label>
+    <textarea id="proj-bullets" rows="5"></textarea>
+    <menu>
+      <button class="ghost" value="cancel">Cancel</button>
+      <button class="download" value="ok">Add</button>
+    </menu>
+  </dialog>
+  <dialog id="dlg-link">
+    <h2 id="link-title">Link</h2>
+    <p id="link-help">Paste the address. Uncheck to hide it on the resume.</p>
+    <label class="check" for="link-show">
+      <input id="link-show" type="checkbox">
+      Show on resume
+    </label>
+    <label for="link-url">Address</label>
+    <input id="link-url" type="text" placeholder="https://">
+    <label for="link-text">Display text</label>
+    <input id="link-text" type="text" placeholder="Link">
+    <menu>
+      <button class="ghost" value="cancel">Cancel</button>
+      <button class="download" value="ok">Save</button>
+    </menu>
+  </dialog>
+  <dialog id="dlg-contacts">
+    <h2>Contact links</h2>
+    <p>Phone and email stay first. Each slot needs a real href.</p>
+    <div id="contact-fields"></div>
+    <menu>
+      <button class="ghost" id="add-slot" type="button">Add slot</button>
+      <span class="spacer"></span>
+      <button class="ghost" value="cancel">Cancel</button>
+      <button class="download" value="ok">Save</button>
+    </menu>
+  </dialog>
+
+  <script type="module" src="/app.js?v=7"></script>
+</body>
+</html>

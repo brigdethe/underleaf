@@ -41,6 +41,19 @@ def test_heading_slots_phone_email_first():
     kinds = [s.kind for s in updated.heading.ordered_slots()]
     assert kinds[:2] == ["phone", "email"]
     assert updated.heading.name == "Beth Example"
+    hidden = update_resume(
+        store,
+        updated.resume_id,
+        updated.revision,
+        "req-h-hide",
+        heading={
+            "slots": [
+                {"kind": "phone", "href": "tel:+15551212", "text": "(555) 512-12"},
+                {"kind": "email", "href": "beth@example.com"},
+            ]
+        },
+    )
+    assert [s.kind for s in hidden.heading.slots] == ["phone", "email"]
 
 
 def test_unknown_ids_raise_validation_error():
@@ -106,6 +119,35 @@ def test_entry_skill_and_coursework_patches():
         "Operating Systems & Security",
         "Intro to AI",
     ]
+
+
+def test_link_url_patch_and_clear():
+    store = ResumeStore()
+    src = seed_bright(store)
+    project = src.sections[2].entries[0]
+    updated = update_resume(
+        store,
+        src.resume_id,
+        src.revision,
+        "req-link",
+        entry_fields=[{
+            "entry_id": project.entry_id,
+            "fields": {},
+            "link_url": "https://example.invalid/x",
+            "link_text": "Demo",
+        }],
+    )
+    assert updated.sections[2].entries[0].link_url == "https://example.invalid/x"
+    assert updated.sections[2].entries[0].link_text == "Demo"
+    cleared = update_resume(
+        store,
+        src.resume_id,
+        updated.revision,
+        "req-link-clear",
+        entry_fields=[{"entry_id": project.entry_id, "fields": {}, "link_url": ""}],
+    )
+    assert cleared.sections[2].entries[0].link_url is None
+    assert cleared.sections[2].entries[0].link_text == "Demo"
 
 
 def test_malformed_patches_raise_validation_error():

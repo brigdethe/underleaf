@@ -1,11 +1,22 @@
 from collections import Counter
 import hashlib
 import json
+import os
 
 from myoverl_mcp.errors import ConflictError, SourceProtectedError, ValidationError
 from myoverl_mcp.ids import new_id
 from myoverl_mcp.models import Bullet, Entry, Heading, Resume, ResumeSummary, Section, SkillRow, stencil_contact
 from myoverl_mcp.store import ResumeStore
+
+
+def editor_url_for(resume_id: str) -> str:
+    base = os.environ.get("MYOVERL_PUBLIC_BASE", "http://127.0.0.1:8765").rstrip("/")
+    return f"{base}/?resume={resume_id}"
+
+
+def _public(resume: Resume) -> Resume:
+    resume.editor_url = editor_url_for(resume.resume_id)
+    return resume
 
 
 def _hash(payload: dict) -> str:
@@ -34,14 +45,14 @@ def list_resumes(store: ResumeStore) -> list[ResumeSummary]:
             name=r.name,
             role=r.role,
             revision=r.revision,
-            editor_url=r.editor_url,
+            editor_url=editor_url_for(r.resume_id),
         )
         for r in store.list_all()
     ]
 
 
 def get_resume(store: ResumeStore, resume_id: str) -> Resume:
-    return store.get(resume_id)
+    return _public(store.get(resume_id))
 
 
 def copy_resume(
@@ -67,10 +78,10 @@ def copy_resume(
     copied.source_id = src.resume_id
     copied.name = copy_name
     copied.revision = 1
-    copied.editor_url = f"https://example.invalid/r/{copied.resume_id}"
+    copied.editor_url = editor_url_for(copied.resume_id)
     stored = store.put(copied)
     store.remember_copy(src.resume_id, request_id, digest, copied)
-    return stored
+    return _public(stored)
 
 
 def update_resume(
@@ -136,6 +147,8 @@ def update_resume(
                 entry = entries_by_id.get(patch["entry_id"])
                 if entry is None:
                     raise ValidationError(f"unknown entry_id: {patch['entry_id']}")
+                if "title" in patch:
+                    entry.title = patch["title"]
                 if "fields" in patch:
                     entry.fields.update(patch["fields"])
                 if "honors" in patch:
@@ -143,7 +156,10 @@ def update_resume(
                 if "technologies" in patch:
                     entry.technologies = list(patch["technologies"])
                 if "link_url" in patch:
-                    entry.link_url = patch["link_url"]
+                    entry.link_url = patch["link_url"] or None
+                if "link_text" in patch:
+                    text = (patch["link_text"] or "").strip()
+                    entry.link_text = text or None
                 if "header_lines" in patch:
                     entry.header_lines = patch["header_lines"]
 
@@ -324,14 +340,17 @@ def add_project(
     technologies: list[str] | None,
     link_url: str | None,
     bullets: list[str],
+    link_text: str | None = None,
 ) -> Resume:
     _require_new_entry(title, bullets)
     techs = list(technologies or [])
+    label = (link_text or "").strip() or None
     digest = _hash(
         {
             "title": title,
             "technologies": techs,
             "link_url": link_url,
+            "link_text": label,
             "bullets": bullets,
         }
     )
@@ -345,6 +364,7 @@ def add_project(
                 title=title,
                 technologies=techs,
                 link_url=link_url,
+                link_text=label,
                 bullets=_new_bullets(bullets),
             )
         )
@@ -493,3 +513,64 @@ def set_layout(
         return resume
 
     return store.apply(resume_id, base_revision, request_id, digest, mutate)
+
+
+def add_person(
+    store: ResumeStore,
+    from_resume_id: str,
+    base_revision: int,
+    request_id: str,
+    person_name: str,
+    heading_name: str,
+) -> Resume:
+    person_name = person_name.strip()
+    heading_name = heading_name.strip()
+    if not person_name or not heading_name:
+        raise ValidationError("person name and heading are required")
+    digest = _hash(
+        {
+            "person_name": person_name,
+            "heading_name": heading_name,
+            "base_revision": base_revision,
+        }
+    )
+    src = store.get(from_resume_id)
+    saved = store.lookup_copy(src.resume_id, request_id)
+    if saved is not None:
+        saved_hash, replayed = saved
+        if saved_hash == digest:
+            return _public(replayed)
+        raise ConflictError(src.revision)
+    if src.revision != base_revision:
+        raise ConflictError(src.revision)
+    created = src.model_copy(deep=True)
+    created.resume_id = new_id("res")
+    created.role = "source"
+    created.source_id = None
+    created.name = person_name
+    created.heading.name = heading_name
+    created.revision = 1
+    created.editor_url = editor_url_for(created.resume_id)
+    stored = store.put(created)
+    store.remember_copy(src.resume_id, request_id, digest, created)
+    return _public(stored)
+
+
+def rename_resume(
+    store: ResumeStore,
+    resume_id: str,
+    base_revision: int,
+    request_id: str,
+    name: str,
+) -> Resume:
+    label = name.strip()
+    if not label:
+        raise ValidationError("name is required")
+    digest = _hash({"name": label})
+
+    def mutate(resume: Resume) -> Resume:
+        resume.name = label
+        return resume
+
+    return _public(store.apply(resume_id, base_revision, request_id, digest, mutate))
+
